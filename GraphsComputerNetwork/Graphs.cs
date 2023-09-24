@@ -8,61 +8,43 @@ namespace GraphsComputerNetwork
 {
     internal class Graphs
     {
-        public class Point
+        public class Vertex
         {
-            private int[] coordinates;
+            private float xCoordinate;
+            private float yCoordinate;
             private string name;
-            public Point(int[]coordinates)
+            private float dataPassthroughModifier;
+            private int number;
+
+            public Vertex(float xCoordinate, float yCoordinate, float dataPassthroughModifier=1,string name="")
             {
-                if (coordinates.Length != 2)
-                {
-                    throw new ArgumentException("Wrong array size");
-                }
-                this.coordinates = coordinates;
-                name = string.Empty;
+                this.dataPassthroughModifier = dataPassthroughModifier;
+                this.xCoordinate = xCoordinate;
+                this.yCoordinate = yCoordinate;
+                this.name = name;
             }
-            public Point(int x, int y)
+            public float GetXCoordinate()
             {
-                coordinates = new int[2] {x,y};
-                name = string.Empty;
+                return xCoordinate;
             }
-            public int[] GetCoordinates()
+            public float GetYCoordinate ()
             {
-                return coordinates;
+                return yCoordinate;
             }
-            public int GetCoordinates (int number)
+            public void SetXCoordinate(float xCoordinate)
             {
-                return coordinates[number];
+                this.xCoordinate=xCoordinate;
             }
-            public int GetX()
+            public void SetTCoordinate(float yCoordinate)
             {
-                return coordinates[0];
+                this.yCoordinate=yCoordinate;
             }
-            public int GetY()
+            public void SetCoordinates(int xCoordinate, int yCoordinate)
             {
-                return coordinates[1];
+                this.xCoordinate = xCoordinate;
+                this.yCoordinate = yCoordinate;
             }
-            public void SetCoordinates(int[]x)
-            {
-                if (coordinates.Length != 2)
-                {
-                    throw new ArgumentException("Wrong array size");
-                }
-                coordinates = x;
-            }
-            public void SetCoordinates(int x, int y)
-            {
-                coordinates[0]= x;
-                coordinates[1]= y;
-            }
-            public void SetX(int x)
-            {
-                coordinates[0] = x;
-            }
-            public void SetY(int y)
-            {
-                coordinates[1]= y;
-            }
+            
             public string GetName()
             {
                 return name;
@@ -71,11 +53,46 @@ namespace GraphsComputerNetwork
             {
                 this.name = name;
             }
+            public void SetDataPassthroughModifier(float dataPassthroughModifier)
+            {
+                this.dataPassthroughModifier= dataPassthroughModifier;
+            }
+            public float GetDataPassthroughModifier()
+            {
+                return dataPassthroughModifier;
+            }
+            public int GetNumber()
+            {
+                return number;
+            }
+            public void SetNumber(int number)
+            {
+                this.number = number;  
+            }
+            public double GetDistance(Vertex otherVertex)
+            {
+                return Math.Sqrt(Math.Pow((otherVertex.GetXCoordinate()-this.GetXCoordinate()),2)+Math.Pow((otherVertex.GetYCoordinate() - this.GetYCoordinate()), 2));
+            }
+
         }
-        public class Edge
+        public class Branch
         {
-            private float length;
-            public float GetLength()
+            private double length;
+            private float modifier;
+            private int startVertexNumber;
+            private int endVertexNumber;
+            private int number;
+            private bool isDirected;
+
+            public Branch(bool isDirected, int startVertexNumber, int endVertexNumber, int number, double length = 0,float modifier=1)
+            {
+                this.isDirected = isDirected;
+                this.startVertexNumber = startVertexNumber;
+                this.endVertexNumber = endVertexNumber;
+                this.number = number;
+                this.length = length;
+            }
+            public double GetLength()
             {
                 return length;
             }
@@ -83,61 +100,114 @@ namespace GraphsComputerNetwork
             {
                 this.length = length;
             }
+            public int GetStartVertexNumber()
+            {
+                return startVertexNumber;
+            }
+            public int GetEndVertexNumber()
+            {
+                return endVertexNumber;
+            }
+            public void SetStartVertexNumber(int startVertexNumber)
+            {
+                this.startVertexNumber = startVertexNumber;
+            }
+            public void SetEndVertexNumber(int endVertexNumber)
+            {
+                this.endVertexNumber = endVertexNumber;
+            }
+            public void SetModifier(float modifier)
+            {
+                this.modifier = modifier;
+            }
+            public float GetModifier()
+            {
+                return modifier;
+            }
+            public bool GetDirection()
+            {
+                return isDirected;
+            }
         }
-        private Point[] points;
-        private Edge[] edges;
-        private float[][] distanceMatrix;
+        
+        private Vertex[] vertices;
+        private Branch[] branches;
+        private float[][] adjacencyMatrix;
         public Graphs() {
-            points = new Point[0];
-            edges = new Edge[0];
+            vertices = new Vertex[0];
+            branches = new Branch[0];
         }
-        public Graphs(Point[] points, Edge[] edges)
+        public Graphs(Vertex[] vertices, Branch[] branches)
         {
-            this.points = points;
-            this.edges = edges;
+            this.vertices = vertices;
+            this.branches = branches;
             //Дописать алгоритм заполнения матрицы расстояний
+            adjacencyMatrix = new float[vertices.Length][];
+            for (int i = 0; i < vertices.Length; i++)
+            {
+                adjacencyMatrix[i]= new float[vertices.Length];
+                for (int j = 0; j < vertices.Length; j++)
+                {
+                    adjacencyMatrix[i][j] = 0;
+                }
+            }
+            foreach(Branch i in branches)
+            {
+                adjacencyMatrix[i.GetStartVertexNumber()][i.GetEndVertexNumber()] = i.GetModifier();
+                if (!i.GetDirection())
+                {
+                    adjacencyMatrix[i.GetEndVertexNumber()][i.GetStartVertexNumber()] = i.GetModifier();
+                }
+            }
         }
-        public void AddEdge(Point Point1, Point Point2)
+        public void AddBranch(Vertex Vertex1, Vertex Vertex2, float modifier,bool isDirected)
         {
-
+            branches.Append(new Branch(isDirected,Vertex1.GetNumber(),Vertex2.GetNumber(),branches.Length,Vertex1.GetDistance(Vertex2),modifier));
         }
         public float[][] GetDistanceMatrix()
         {
-            return distanceMatrix;
+            return adjacencyMatrix;
         }
-        public float[] GetDistanceMatrix(int numberOfPoint)
+        public float[] GetAdjecencyMatrix(int numberOfPoint)
         {
-            return distanceMatrix[numberOfPoint];
-        }
-        
-        public Point[] GetPoints()
+            return adjacencyMatrix[numberOfPoint];
+        } 
+        public void AddVertex(Vertex newVertex)
         {
-            return points;
+            newVertex.SetNumber(vertices.Length);
+            vertices.Append(newVertex);
         }
-        public Point GetPoint(int number)
+        public Vertex[] GetVertices()
         {
-            return points[number];
+            return vertices;
         }
-        public Edge[] GetEdges()
+        public Vertex GetVertices(int number)
         {
-            return edges;
+            return vertices[number];
         }
-        public Edge GetEdges(int number)
+        public Branch[] GetBranches()
         {
-            return edges[number];               
+            return branches;
         }
-        public void SetPointCoordinates(int PointNumber, int[]coordinates)
+        public Branch GetBranches(int number)
         {
-            points[PointNumber].SetCoordinates(coordinates);
+            return branches[number];               
         }
+        public void SetVertexCoordinates(int PointNumber, int x, int y)
+        {
+            vertices[PointNumber].SetCoordinates(x, y);
+        }
+        public IEnumerable<int> GetAdjacentVertices(int vertexNumber)
+        {
+            if (vertexNumber < 0 || vertexNumber >= this.vertices.Length) throw new ArgumentOutOfRangeException("Cannot access vertex");
 
-        public void AddPoint(Point newPoint)
-        {
-            points.Append(newPoint);
-        }
-        public void AddEdge(Edge newEdge)
-        {
-            edges.Append(newEdge);
+            List<int> adjacentVertices = new List<int>();
+            for (int i = 0; i < this.vertices.Length; i++)
+            {
+                if (this.adjacencyMatrix[vertexNumber][i] > 0)
+                    adjacentVertices.Add(i);
+            }
+            return adjacentVertices;
         }
     }
 }

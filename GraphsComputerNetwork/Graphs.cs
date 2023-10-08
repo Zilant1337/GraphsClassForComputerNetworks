@@ -133,7 +133,8 @@ namespace GraphsComputerNetwork
 
         private Vertex[] vertices;
         private Edge[] edges;
-        private float[][] adjacencyMatrix;
+        private double[][] adjacencyMatrix;
+        private double[][] fastestPathsMatrix;
         private string name;
         public Graphs() {
             vertices = new Vertex[0];
@@ -144,14 +145,16 @@ namespace GraphsComputerNetwork
             this.vertices = vertices;
             this.edges = edges;
             this.name = name;
-            adjacencyMatrix = new float[vertices.Length][];
+            adjacencyMatrix = new double[vertices.Length][];
             for (int i = 0; i < vertices.Length; i++)
             {
-                adjacencyMatrix[i] = new float[vertices.Length];
+                fastestPathsMatrix[i] = new double[edges.Length];
+                adjacencyMatrix[i] = new double[vertices.Length];
                 for (int j = 0; j < vertices.Length; j++)
                 {
                     adjacencyMatrix[i][j] = 0;
                 }
+                
             }
             foreach (Edge i in edges)
             {
@@ -161,6 +164,7 @@ namespace GraphsComputerNetwork
                     adjacencyMatrix[i.GetEndVertex().GetNumber()][i.GetStartVertex().GetNumber()] = i.GetModifier();
                 }
             }
+            
 
             this.name = name;
         }
@@ -168,11 +172,11 @@ namespace GraphsComputerNetwork
         {
             edges.Append(new Edge(isDirected, Vertex1, Vertex2, edges.Length, Vertex1.GetDistance(Vertex2), modifier));
         }
-        public float[][] GetAdjacencyMatrix()
+        public double[][] GetAdjacencyMatrix()
         {
             return adjacencyMatrix;
         }
-        public float[] GetAdjecencyMatrix(int numberOfPoint)
+        public double[] GetAdjecencyMatrix(int numberOfPoint)
         {
             return adjacencyMatrix[numberOfPoint];
         }
@@ -220,6 +224,76 @@ namespace GraphsComputerNetwork
         public void SetName(string name)
         {
             this.name = name;
+        }
+        
+        public double GetShortestPath(Vertex vert1, Vertex vert2)
+        {
+            return fastestPathsMatrix[vert1.GetNumber()][vert2.GetNumber()];
+        }
+        public void GenerateFastestRoutes()
+        {
+            for (int i = 0; i < edges.Length; i++)
+            {
+                fastestPathsMatrix[i] = new double[edges.Length];
+                bool[] sptSet=new bool[edges.Length];
+                for(int j = 0; j < edges.Length; j++)
+                {
+                    fastestPathsMatrix[i][j]=double.MaxValue;
+                    sptSet[j]=false;
+                }
+                fastestPathsMatrix[i][i]=0;
+                for(int count = 0; count < edges.Length - 1; count++)
+                {
+                    int u = MinDistance(fastestPathsMatrix[i], sptSet,edges.Length);
+                    sptSet[u] = true;
+                    for (int v = 0; v < edges.Length; v++)
+                    {
+                        if (!sptSet[v] && adjacencyMatrix[u][v] != 0 && fastestPathsMatrix[i][u]
+                            != double.MaxValue && fastestPathsMatrix[i][u]
+                            + GetEdge(vertices[u], vertices[v]).GetLength() * 
+                            GetEdge(vertices[u], vertices[v]).GetModifier() * 
+                            vertices[u].GetDataPassthroughModifier() * 
+                            vertices[v].GetDataPassthroughModifier() 
+                            < fastestPathsMatrix[i][v])
+                        {
+                            fastestPathsMatrix[i][v] = fastestPathsMatrix[i][u]
+                            + GetEdge(vertices[u], vertices[v]).GetLength() *
+                            GetEdge(vertices[u], vertices[v]).GetModifier() *
+                            vertices[u].GetDataPassthroughModifier() *
+                            vertices[v].GetDataPassthroughModifier();
+                        }
+                    }
+                }
+
+            }
+            return;
+        }
+        private int MinDistance(double[] distance, bool[]sptSet,int V)
+        {
+            double min =double.MaxValue;
+            int minIndex = -1;
+            for (int v = 0; v < V; v++)
+            {
+                if (!sptSet[v] && distance[v] <= min)
+                {
+                    min = distance[v];
+                    minIndex = v;
+                }
+            }
+            return minIndex;
+        }
+        public Edge GetEdge(Vertex vert1,Vertex vert2)
+        {
+            foreach (Edge edge in edges)
+            {
+                if ((!edge.GetDirection()&&(edge.GetStartVertex()==vert1&&edge.GetEndVertex()==vert2
+                    || edge.GetStartVertex() == vert2 && edge.GetEndVertex() == vert1))
+                    ||(edge.GetDirection()&&edge.GetStartVertex()==vert1&&edge.GetEndVertex()==vert2))
+                {
+                    return edge;
+                }
+            }
+            return null;
         }
     }
 }

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace GraphsComputerNetwork
 {
-    internal class Graphs
+    internal class Graph
     {
         public class Vertex
         {
@@ -14,15 +14,13 @@ namespace GraphsComputerNetwork
             private float yCoordinate;
             private string name;
             private float dataPassthroughModifier;
-            private int number;
 
-            public Vertex(float xCoordinate, float yCoordinate, float dataPassthroughModifier = 1, string name = "", int number = -1)
+            public Vertex(float xCoordinate, float yCoordinate, float dataPassthroughModifier = 1, string name = "")
             {
                 this.dataPassthroughModifier = dataPassthroughModifier;
                 this.xCoordinate = xCoordinate;
                 this.yCoordinate = yCoordinate;
                 this.name = name;
-                this.number = number;
             }
             public float GetXCoordinate()
             {
@@ -62,14 +60,6 @@ namespace GraphsComputerNetwork
             {
                 return dataPassthroughModifier;
             }
-            public int GetNumber()
-            {
-                return number;
-            }
-            public void SetNumber(int number)
-            {
-                this.number = number;
-            }
             public double GetDistance(Vertex otherVertex)
             {
                 return Math.Sqrt(Math.Pow((otherVertex.GetXCoordinate() - this.GetXCoordinate()), 2) + Math.Pow((otherVertex.GetYCoordinate() - this.GetYCoordinate()), 2));
@@ -78,28 +68,20 @@ namespace GraphsComputerNetwork
         }
         public class Edge
         {
-            private double length;
-            private float modifier;
+            private float maxLoad;
+            private float currentLoad;
             private Vertex startVertex;
             private Vertex endVertex;
-            private int number;
+            
             private bool isDirected;
 
-            public Edge(bool isDirected, Vertex startVertex, Vertex endVertex, int number, double length = 0, float modifier = 1)
+            public Edge(bool isDirected, Vertex startVertex, Vertex endVertex, float maxLoad, float currentLoad=0)
             {
                 this.isDirected = isDirected;
                 this.startVertex = startVertex;
                 this.endVertex = endVertex;
-                this.number = number;
-                this.length = length;
-            }
-            public double GetLength()
-            {
-                return length;
-            }
-            public void SetLength(float length)
-            {
-                this.length = length;
+                this.currentLoad = currentLoad;
+                this.maxLoad = maxLoad;
             }
             public Vertex GetStartVertex()
             {
@@ -117,13 +99,21 @@ namespace GraphsComputerNetwork
             {
                 this.endVertex = endVertex;
             }
-            public void SetModifier(float modifier)
+            public void SetMaxLoad(float maxLoad)
             {
-                this.modifier = modifier;
+                this.maxLoad = maxLoad;
             }
-            public float GetModifier()
+            public float GetMaxLoad()
             {
-                return modifier;
+                return maxLoad;
+            }
+            public void AddLoad(float addedLoad)
+            {
+                currentLoad += addedLoad;
+            }
+            public float GetCurrentLoad()
+            {
+                return currentLoad;
             }
             public bool GetDirection()
             {
@@ -131,26 +121,27 @@ namespace GraphsComputerNetwork
             }
         }
 
-        private Vertex[] vertices;
-        private Edge[] edges;
+        private List<Vertex> vertices;
+        private List<Edge> edges;
         private double[][] adjacencyMatrix;
+        private double[][] loadMatrix;
         private double[][] fastestPathsMatrix;
         private string name;
-        public Graphs() {
-            vertices = new Vertex[0];
-            edges = new Edge[0];
+        public Graph() {
+            vertices = new List<Vertex>();
+            edges = new List<Edge>();
         }
-        public Graphs(Vertex[] vertices, Edge[] edges= null, string name = "")
+        public Graph(List<Vertex> vertices, List<Edge> edges= null, string name = "")
         {
             this.vertices = vertices;
             this.edges = edges;
             this.name = name;
-            adjacencyMatrix = new double[vertices.Length][];
-            for (int i = 0; i < vertices.Length; i++)
+            adjacencyMatrix = new double[vertices.Count()][];
+            for (int i = 0; i < vertices.Count(); i++)
             {
-                fastestPathsMatrix[i] = new double[edges.Length];
-                adjacencyMatrix[i] = new double[vertices.Length];
-                for (int j = 0; j < vertices.Length; j++)
+                fastestPathsMatrix[i] = new double[edges.Count()];
+                adjacencyMatrix[i] = new double[vertices.Count()];
+                for (int j = 0; j < vertices.Count(); j++)
                 {
                     adjacencyMatrix[i][j] = 0;
                 }
@@ -158,19 +149,19 @@ namespace GraphsComputerNetwork
             }
             foreach (Edge i in edges)
             {
-                adjacencyMatrix[i.GetStartVertex().GetNumber()][i.GetEndVertex().GetNumber()] = i.GetModifier();
+                adjacencyMatrix[vertices.IndexOf(i.GetStartVertex())][vertices.IndexOf(i.GetEndVertex())] = 1;
                 if (!i.GetDirection())
                 {
-                    adjacencyMatrix[i.GetEndVertex().GetNumber()][i.GetStartVertex().GetNumber()] = i.GetModifier();
+                    adjacencyMatrix[vertices.IndexOf(i.GetEndVertex())][vertices.IndexOf(i.GetStartVertex())] =1;
                 }
             }
             
 
             this.name = name;
         }
-        public void AddEdge(Vertex Vertex1, Vertex Vertex2, float modifier, bool isDirected)
+        public void AddEdge(Vertex Vertex1, Vertex Vertex2, float maxLoad, bool isDirected,float currentLoad=0)
         {
-            edges.Append(new Edge(isDirected, Vertex1, Vertex2, edges.Length, Vertex1.GetDistance(Vertex2), modifier));
+            edges.Append(new Edge(isDirected, Vertex1, Vertex2,maxLoad,currentLoad));
         }
         public double[][] GetAdjacencyMatrix()
         {
@@ -182,10 +173,11 @@ namespace GraphsComputerNetwork
         }
         public void AddVertex(Vertex newVertex)
         {
-            newVertex.SetNumber(vertices.Length);
             vertices.Append(newVertex);
+            ReformAdjacencyMatrix();
+            GenerateFastestRoutes();
         }
-        public Vertex[] GetVertices()
+        public List<Vertex> GetVertices()
         {
             return vertices;
         }
@@ -193,7 +185,7 @@ namespace GraphsComputerNetwork
         {
             return vertices[number];
         }
-        public Edge[] GetEdges()
+        public List<Edge> GetEdges()
         {
             return edges;
         }
@@ -207,10 +199,10 @@ namespace GraphsComputerNetwork
         }
         public IEnumerable<Vertex> GetAdjacentVertices(int vertexNumber)
         {
-            if (vertexNumber < 0 || vertexNumber >= this.vertices.Length) throw new ArgumentOutOfRangeException("Cannot access vertex");
+            if (vertexNumber < 0 || vertexNumber >= this.vertices.Count()) throw new ArgumentOutOfRangeException("Cannot access vertex");
 
             List<Vertex> adjacentVertices = new List<Vertex>();
-            for (int i = 0; i < this.vertices.Length; i++)
+            for (int i = 0; i < this.vertices.Count(); i++)
             {
                 if (this.adjacencyMatrix[vertexNumber][i] > 0)
                     adjacentVertices.Add(vertices[i]);
@@ -228,39 +220,33 @@ namespace GraphsComputerNetwork
         
         public double GetShortestPath(Vertex vert1, Vertex vert2)
         {
-            return fastestPathsMatrix[vert1.GetNumber()][vert2.GetNumber()];
+            return fastestPathsMatrix[vertices.IndexOf(vert1)][vertices.IndexOf(vert2)];
         }
         public void GenerateFastestRoutes()
         {
-            for (int i = 0; i < edges.Length; i++)
+            for (int i = 0; i < edges.Count(); i++)
             {
-                fastestPathsMatrix[i] = new double[edges.Length];
-                bool[] sptSet=new bool[edges.Length];
-                for(int j = 0; j < edges.Length; j++)
+                fastestPathsMatrix[i] = new double[edges.Count()];
+                bool[] sptSet=new bool[edges.Count()];
+                for(int j = 0; j < edges.Count(); j++)
                 {
                     fastestPathsMatrix[i][j]=double.MaxValue;
                     sptSet[j]=false;
                 }
                 fastestPathsMatrix[i][i]=0;
-                for(int count = 0; count < edges.Length - 1; count++)
+                for(int count = 0; count < edges.Count() - 1; count++)
                 {
-                    int u = MinDistance(fastestPathsMatrix[i], sptSet,edges.Length);
+                    int u = MinDistanceIndex(fastestPathsMatrix[i], sptSet,edges.Count());
                     sptSet[u] = true;
-                    for (int v = 0; v < edges.Length; v++)
+                    for (int v = 0; v < edges.Count(); v++)
                     {
                         if (!sptSet[v] && adjacencyMatrix[u][v] != 0 && fastestPathsMatrix[i][u]
                             != double.MaxValue && fastestPathsMatrix[i][u]
-                            + GetEdge(vertices[u], vertices[v]).GetLength() * 
-                            GetEdge(vertices[u], vertices[v]).GetModifier() * 
-                            vertices[u].GetDataPassthroughModifier() * 
-                            vertices[v].GetDataPassthroughModifier() 
+                            + adjacencyMatrix[u][v]
                             < fastestPathsMatrix[i][v])
                         {
                             fastestPathsMatrix[i][v] = fastestPathsMatrix[i][u]
-                            + GetEdge(vertices[u], vertices[v]).GetLength() *
-                            GetEdge(vertices[u], vertices[v]).GetModifier() *
-                            vertices[u].GetDataPassthroughModifier() *
-                            vertices[v].GetDataPassthroughModifier();
+                            + adjacencyMatrix[u][v];
                         }
                     }
                 }
@@ -268,7 +254,7 @@ namespace GraphsComputerNetwork
             }
             return;
         }
-        private int MinDistance(double[] distance, bool[]sptSet,int V)
+        private int MinDistanceIndex(double[] distance, bool[]sptSet,int V)
         {
             double min =double.MaxValue;
             int minIndex = -1;
@@ -294,6 +280,57 @@ namespace GraphsComputerNetwork
                 }
             }
             return null;
+        }
+        public void RemoveVertex(Vertex vert)
+        {
+            vertices.Remove(vert);
+            foreach(Vertex i in vertices)
+            {
+                if (GetEdge(vert, i)!=null)
+                {
+                    edges.Remove(GetEdge(vert, i));
+                    if (GetEdge(i, vert) != null)
+                    {
+                        edges.Remove(GetEdge(i,vert));
+                    }
+                }
+            }
+            ReformAdjacencyMatrix();
+            GenerateFastestRoutes();
+
+        }
+        public void RemoveEdge(Edge edge)
+        {
+            edges.Remove(edge);
+            ReformAdjacencyMatrix();
+            GenerateFastestRoutes();
+        }
+        public void RemoveEdge(Vertex vert1, Vertex vert2)
+        {
+            edges.Remove(GetEdge(vert1, vert2));
+            ReformAdjacencyMatrix();
+            GenerateFastestRoutes();
+        }
+        private void ReformAdjacencyMatrix()
+        {
+            adjacencyMatrix = new double[vertices.Count()][];
+            for (int i = 0; i < vertices.Count(); i++)
+            {
+                adjacencyMatrix[i] = new double[vertices.Count()];
+                for (int j = 0; j < vertices.Count(); j++)
+                {
+                    adjacencyMatrix[i][j] = 0;
+                }
+
+            }
+            foreach (Edge i in edges)
+            {
+                adjacencyMatrix[vertices.IndexOf(i.GetStartVertex())][vertices.IndexOf(i.GetEndVertex())] = 1;
+                if (!i.GetDirection())
+                {
+                    adjacencyMatrix[vertices.IndexOf(i.GetEndVertex())][vertices.IndexOf(i.GetStartVertex())] = 1;
+                }
+            }
         }
     }
 }

@@ -69,20 +69,20 @@ namespace GraphsComputerNetwork
         public class Edge
         {
             // Bandwidth в мегабитах/с
-            private double maxLoad;
-            private double currentLoad;
+            private double Bandwidth;
+            private double currentFlow;
             private Vertex startVertex;
             private Vertex endVertex;
             
             private bool isDirected;
 
-            public Edge(bool isDirected, Vertex startVertex, Vertex endVertex, double maxLoad=0, double currentLoad=0) 
+            public Edge(bool isDirected, Vertex startVertex, Vertex endVertex, double Bandwidth=0, double currentFlow=0) 
             {
                 this.isDirected = isDirected;
                 this.startVertex = startVertex;
                 this.endVertex = endVertex;
-                this.currentLoad = currentLoad;
-                this.maxLoad = maxLoad;
+                this.currentFlow = currentFlow;
+                this.Bandwidth = Bandwidth;
             }
             public Vertex GetStartVertex()
             {
@@ -100,35 +100,39 @@ namespace GraphsComputerNetwork
             {
                 this.endVertex = endVertex;
             }
-            public void SetMaxLoad(double maxLoad)
+            public void SetBandwidth(double maxLoad)
             {
-                this.maxLoad = maxLoad;
+                this.Bandwidth = maxLoad;
             }
-            public double GetMaxLoad()
+            public double GetBandwidth()
             {
-                return maxLoad;
+                return Bandwidth;
             }
-            public void AddLoad(double addedLoad)
+            public void AddFlow(double addedLoad)
             {
-                if (currentLoad + addedLoad <= maxLoad) 
+                if (currentFlow + addedLoad <= Bandwidth) 
                 {
-                    currentLoad += addedLoad;
-                }
-            }
-            public void RemoveLoad(double removableLoad)
-            {
-                if (currentLoad >= removableLoad)
-                {
-                    currentLoad-=removableLoad;
+                    currentFlow += addedLoad;
                 }
                 else
                 {
-                    throw new ArgumentOutOfRangeException();
+                    throw new ArgumentOutOfRangeException("Out of range");
                 }
             }
-            public double GetCurrentLoad()
+            public void RemoveFlow(double removableLoad)
             {
-                return currentLoad;
+                if (currentFlow >= removableLoad)
+                {
+                    currentFlow-=removableLoad;
+                }
+                else
+                {
+                    throw new ArgumentOutOfRangeException("Out of range");
+                }
+            }
+            public double GetCurrentFlow()
+            {
+                return currentFlow;
             }
             public bool GetDirection()
             {
@@ -389,6 +393,10 @@ namespace GraphsComputerNetwork
         public void RemoveBandwidthsFromList(double oldStandart)
         {
             possibleBandwidths.Remove(oldStandart);
+        }
+        public void ChangeBandwidth(Edge edge, double newBandwidth)
+        {
+            edge.SetBandwidth(newBandwidth);
         }
 
     }

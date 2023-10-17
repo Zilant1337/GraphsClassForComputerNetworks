@@ -68,14 +68,15 @@ namespace GraphsComputerNetwork
         }
         public class Edge
         {
-            private float maxLoad;
-            private float currentLoad;
+            // Bandwidth в мегабитах/с
+            private double maxLoad;
+            private double currentLoad;
             private Vertex startVertex;
             private Vertex endVertex;
             
             private bool isDirected;
 
-            public Edge(bool isDirected, Vertex startVertex, Vertex endVertex, float maxLoad, float currentLoad=0)
+            public Edge(bool isDirected, Vertex startVertex, Vertex endVertex, double maxLoad=0, double currentLoad=0) 
             {
                 this.isDirected = isDirected;
                 this.startVertex = startVertex;
@@ -99,19 +100,33 @@ namespace GraphsComputerNetwork
             {
                 this.endVertex = endVertex;
             }
-            public void SetMaxLoad(float maxLoad)
+            public void SetMaxLoad(double maxLoad)
             {
                 this.maxLoad = maxLoad;
             }
-            public float GetMaxLoad()
+            public double GetMaxLoad()
             {
                 return maxLoad;
             }
-            public void AddLoad(float addedLoad)
+            public void AddLoad(double addedLoad)
             {
-                currentLoad += addedLoad;
+                if (currentLoad + addedLoad <= maxLoad) 
+                {
+                    currentLoad += addedLoad;
+                }
             }
-            public float GetCurrentLoad()
+            public void RemoveLoad(double removableLoad)
+            {
+                if (currentLoad >= removableLoad)
+                {
+                    currentLoad-=removableLoad;
+                }
+                else
+                {
+                    throw new ArgumentOutOfRangeException();
+                }
+            }
+            public double GetCurrentLoad()
             {
                 return currentLoad;
             }
@@ -126,24 +141,35 @@ namespace GraphsComputerNetwork
         private double[][] adjacencyMatrix;
         private double[][] loadMatrix;
         private double[][] fastestPathsMatrix;
+        private double[][] tempFlows;
         private string name;
+        private List<double> possibleBandwidths= new List<double>{ 2560, 3686, 4096, 5120, 8192, 10240, 10557, 13107, 13967, 16384,
+            20480, 24576,25221, 25600,26214, 32768,40960, 42240, 49152,51200, 54886, 55848, 81920, 98304, 102400,
+            126720, 163348, 167567, 204800,307200, 409600,614400 };
+
         public Graph() {
             vertices = new List<Vertex>();
             edges = new List<Edge>();
         }
-        public Graph(List<Vertex> vertices, List<Edge> edges= null, string name = "")
+        public Graph(List<Vertex> vertices, double[][]loadMatrix, List<Edge> edges= null, string name = "")
         {
             this.vertices = vertices;
             this.edges = edges;
             this.name = name;
             adjacencyMatrix = new double[vertices.Count()][];
+            this.loadMatrix = new double[vertices.Count()][];
+            tempFlows = new double[vertices.Count()][];
             for (int i = 0; i < vertices.Count(); i++)
             {
-                fastestPathsMatrix[i] = new double[edges.Count()];
+                fastestPathsMatrix[i] = new double[vertices.Count()];
                 adjacencyMatrix[i] = new double[vertices.Count()];
+                this.loadMatrix[i]=new double[vertices.Count()];
+                tempFlows[i]= new double[vertices.Count()];
                 for (int j = 0; j < vertices.Count(); j++)
                 {
+                    this.loadMatrix[i][j] =loadMatrix[i][j];
                     adjacencyMatrix[i][j] = 0;
+                    tempFlows[i][j] = 0;
                 }
                 
             }
@@ -155,8 +181,8 @@ namespace GraphsComputerNetwork
                     adjacencyMatrix[vertices.IndexOf(i.GetEndVertex())][vertices.IndexOf(i.GetStartVertex())] =1;
                 }
             }
-            
-
+            GenerateFastestRoutes();
+            SuggestMinimalBandwidthsBasedOnTempLoads();
             this.name = name;
         }
         public void AddEdge(Vertex Vertex1, Vertex Vertex2, float maxLoad, bool isDirected,float currentLoad=0)
@@ -176,6 +202,7 @@ namespace GraphsComputerNetwork
             vertices.Append(newVertex);
             ReformAdjacencyMatrix();
             GenerateFastestRoutes();
+            SuggestMinimalBandwidthsBasedOnTempLoads();
         }
         public List<Vertex> GetVertices()
         {
@@ -224,21 +251,21 @@ namespace GraphsComputerNetwork
         }
         public void GenerateFastestRoutes()
         {
-            for (int i = 0; i < edges.Count(); i++)
+            for (int i = 0; i < vertices.Count(); i++)
             {
-                fastestPathsMatrix[i] = new double[edges.Count()];
-                bool[] sptSet=new bool[edges.Count()];
-                for(int j = 0; j < edges.Count(); j++)
+                fastestPathsMatrix[i] = new double[vertices.Count()];
+                bool[] sptSet=new bool[vertices.Count()];
+                for(int j = 0; j < vertices.Count(); j++)
                 {
                     fastestPathsMatrix[i][j]=double.MaxValue;
                     sptSet[j]=false;
                 }
                 fastestPathsMatrix[i][i]=0;
-                for(int count = 0; count < edges.Count() - 1; count++)
+                for(int count = 0; count < vertices.Count() - 1; count++)
                 {
-                    int u = MinDistanceIndex(fastestPathsMatrix[i], sptSet,edges.Count());
+                    int u = MinDistanceIndex(fastestPathsMatrix[i], sptSet,vertices.Count());
                     sptSet[u] = true;
-                    for (int v = 0; v < edges.Count(); v++)
+                    for (int v = 0; v < vertices.Count(); v++)
                     {
                         if (!sptSet[v] && adjacencyMatrix[u][v] != 0 && fastestPathsMatrix[i][u]
                             != double.MaxValue && fastestPathsMatrix[i][u]
@@ -247,6 +274,11 @@ namespace GraphsComputerNetwork
                         {
                             fastestPathsMatrix[i][v] = fastestPathsMatrix[i][u]
                             + adjacencyMatrix[u][v];
+                            tempFlows[u][v]+=loadMatrix[u][v];
+                            if (!GetEdge(vertices[u], vertices[v]).GetDirection())
+                            {
+                                tempFlows[v][u] += loadMatrix[u][v];
+                            }
                         }
                     }
                 }
@@ -297,19 +329,21 @@ namespace GraphsComputerNetwork
             }
             ReformAdjacencyMatrix();
             GenerateFastestRoutes();
-
+            SuggestMinimalBandwidthsBasedOnTempLoads();
         }
         public void RemoveEdge(Edge edge)
         {
             edges.Remove(edge);
             ReformAdjacencyMatrix();
             GenerateFastestRoutes();
+            SuggestMinimalBandwidthsBasedOnTempLoads();
         }
         public void RemoveEdge(Vertex vert1, Vertex vert2)
         {
             edges.Remove(GetEdge(vert1, vert2));
             ReformAdjacencyMatrix();
             GenerateFastestRoutes();
+            SuggestMinimalBandwidthsBasedOnTempLoads();
         }
         private void ReformAdjacencyMatrix()
         {
@@ -332,5 +366,30 @@ namespace GraphsComputerNetwork
                 }
             }
         }
+        private void SuggestMinimalBandwidthsBasedOnTempLoads()
+        {
+            for (int i = 0; i < vertices.Count(); i++)
+            {
+                for(int j = 0;j < vertices.Count();j++)
+                {
+                    foreach (int bandwidth in possibleBandwidths)
+                    {
+                        if (bandwidth >= tempFlows[i][j])
+                        {
+                            GetEdge(vertices[i], vertices[j]).SetMaxLoad(bandwidth);
+                        }
+                    }
+                }
+            }
+        }
+        public void AddBandwidthsToList(double newStandart )
+        {
+            possibleBandwidths.Add(newStandart);
+        }
+        public void RemoveBandwidthsFromList(double oldStandart)
+        {
+            possibleBandwidths.Remove(oldStandart);
+        }
+
     }
 }

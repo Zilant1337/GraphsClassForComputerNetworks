@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Data;
+using System.Data.SqlClient;
 
 namespace GraphsComputerNetwork
 {
@@ -155,7 +157,7 @@ namespace GraphsComputerNetwork
             vertices = new List<Vertex>();
             edges = new List<Edge>();
         }
-        public Graph(List<Vertex> vertices, double[][]loadMatrix, List<Edge> edges= null, string name = "")
+        public Graph(List<Vertex> vertices=null, double[][]loadMatrix=null, List<Edge> edges= null, string name = "")
         {
             this.vertices = vertices;
             this.edges = edges;
@@ -380,7 +382,7 @@ namespace GraphsComputerNetwork
                     {
                         if (bandwidth >= tempFlows[i][j])
                         {
-                            GetEdge(vertices[i], vertices[j]).SetMaxLoad(bandwidth);
+                            GetEdge(vertices[i], vertices[j]).SetBandwidth(bandwidth);
                         }
                     }
                 }

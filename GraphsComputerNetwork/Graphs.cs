@@ -7,6 +7,8 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.IO;
+using System.Runtime.Remoting.Metadata;
 
 namespace GraphsComputerNetwork
 {
@@ -207,13 +209,14 @@ namespace GraphsComputerNetwork
                     adjacencyMatrix[vertices.IndexOf(i.GetEndVertex())][vertices.IndexOf(i.GetStartVertex())] =1;
                 }
             }
-            GenerateFastestRoutes();
-            SuggestMinimalBandwidthsBasedOnTempLoads();
+            GenerateAllRoutes();
             this.name = name;
         }
         public void AddEdge(Vertex Vertex1, Vertex Vertex2, float maxLoad, bool isDirected,float currentLoad=0)
         {
             edges.Append(new Edge(Vertex1, Vertex2,maxLoad, currentLoad,isDirected));
+            ReformAdjacencyMatrix();
+            GenerateAllRoutes();
         }
         public double[][] GetAdjacencyMatrix()
         {
@@ -240,7 +243,7 @@ namespace GraphsComputerNetwork
         {
             return edges;
         }
-        public Edge GetEdges(int number)
+        public Edge GetEdge(int number)
         {
             return edges[number];
         }
@@ -273,43 +276,7 @@ namespace GraphsComputerNetwork
         {
             return fastestPathsMatrix[vertices.IndexOf(vert1)][vertices.IndexOf(vert2)];
         }
-        public void GenerateFastestRoutes()
-        {
-            for (int i = 0; i < vertices.Count(); i++)
-            {
-                fastestPathsMatrix[i] = new double[vertices.Count()];
-                bool[] sptSet=new bool[vertices.Count()];
-                for(int j = 0; j < vertices.Count(); j++)
-                {
-                    fastestPathsMatrix[i][j]=double.MaxValue;
-                    sptSet[j]=false;
-                }
-                fastestPathsMatrix[i][i]=0;
-                for(int count = 0; count < vertices.Count() - 1; count++)
-                {
-                    int u = MinDistanceIndex(fastestPathsMatrix[i], sptSet,vertices.Count());
-                    sptSet[u] = true;
-                    for (int v = 0; v < vertices.Count(); v++)
-                    {
-                        if (!sptSet[v] && adjacencyMatrix[u][v] != 0 && fastestPathsMatrix[i][u]
-                            != double.MaxValue && fastestPathsMatrix[i][u]
-                            + adjacencyMatrix[u][v]
-                            < fastestPathsMatrix[i][v])
-                        {
-                            fastestPathsMatrix[i][v] = fastestPathsMatrix[i][u]
-                            + adjacencyMatrix[u][v];
-                            tempFlows[u][v]+=loadMatrix[u][v];
-                            if (!GetEdge(vertices[u], vertices[v]).GetDirection())
-                            {
-                                tempFlows[v][u] += loadMatrix[u][v];
-                            }
-                        }
-                    }
-                }
-
-            }
-            return;
-        }
+        
 
         private void GenerateAllRoutes()
         {
@@ -387,23 +354,8 @@ namespace GraphsComputerNetwork
             }
             ReformAdjacencyMatrix();
             GenerateAllRoutes();
-            SuggestMinimalBandwidthsBasedOnTempLoads();
         }
 
-        private int MinDistanceIndex(double[] distance, bool[]sptSet,int V)
-        {
-            double min =double.MaxValue;
-            int minIndex = -1;
-            for (int v = 0; v < V; v++)
-            {
-                if (!sptSet[v] && distance[v] <= min)
-                {
-                    min = distance[v];
-                    minIndex = v;
-                }
-            }
-            return minIndex;
-        }
         public Edge GetEdge(Vertex vert1,Vertex vert2)
         {
             foreach (Edge edge in edges)
@@ -437,8 +389,7 @@ namespace GraphsComputerNetwork
         {
             edges.Remove(edge);
             ReformAdjacencyMatrix();
-            GenerateFastestRoutes();
-            SuggestMinimalBandwidthsBasedOnTempLoads();
+            GenerateAllRoutes();
         }
         public void RemoveEdge(Vertex vert1, Vertex vert2)
         {
@@ -500,6 +451,7 @@ namespace GraphsComputerNetwork
                     }
                 }
             }
+            tempFlows = null;
         }
         public void AddBandwidthsToList(double newStandart )
         {
@@ -513,17 +465,27 @@ namespace GraphsComputerNetwork
         {
             edge.SetBandwidth(newBandwidth);
         }
-        public void AddLoad(Edge edge,double additionalLoad)
+        public void AddFlow(Edge edge,double additionalLoad)
         {
             edge.AddFlow(additionalLoad);
+        }
+        public void AddFlow(double extraFlow,Vertex vert1,Vertex vert2)
+        {
+            List<int>path=GetPath(vert1, vert2);
+            for(int i = 0; i < path.Count() - 1; i++)
+            {
+                GetEdge(vertices[i], vertices[i + 1]).AddFlow(extraFlow);
+            }
         }
         public void ClearGraph()
         {
             foreach (Vertex v in vertices)
             {
-                RemoveVertex(v);
+                RemoveVertex(v);   
             }
-
+            ReformAdjacencyMatrix();
+            loadMatrix = null;
+            tempFlows = null;
         }
         public Vertex GetVertex(int index)
         {

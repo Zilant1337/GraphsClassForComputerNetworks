@@ -13,9 +13,7 @@ namespace GraphsComputerNetwork
     {
         static void Main(string[] args)
         {
-            string connectionString = "Data Source=(LocalDB)\\MSSQLLocalDB;AttachDbFilename=" + Directory.GetParent(Environment.CurrentDirectory).Parent.Parent.FullName + @"\data\dbTest.mdf; Integrated Security=True;";
-            SqlConnection connection = new SqlConnection(connectionString);
-            connection.Open();
+            
         }
     }
 }

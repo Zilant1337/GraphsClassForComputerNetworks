@@ -5,6 +5,8 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Data;
 using System.Data.SqlClient;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace GraphsComputerNetwork
 {
@@ -16,13 +18,15 @@ namespace GraphsComputerNetwork
             private float yCoordinate;
             private string name;
             private float dataPassthroughModifier;
+            private int index;
 
-            public Vertex(float xCoordinate, float yCoordinate, float dataPassthroughModifier = 1, string name = "")
+            public Vertex(float xCoordinate, float yCoordinate, float dataPassthroughModifier = 1, string name = "", int index = -1)
             {
                 this.dataPassthroughModifier = dataPassthroughModifier;
                 this.xCoordinate = xCoordinate;
                 this.yCoordinate = yCoordinate;
                 this.name = name;
+                this.index = index;
             }
             public float GetXCoordinate()
             {
@@ -66,6 +70,14 @@ namespace GraphsComputerNetwork
             {
                 return Math.Sqrt(Math.Pow((otherVertex.GetXCoordinate() - this.GetXCoordinate()), 2) + Math.Pow((otherVertex.GetYCoordinate() - this.GetYCoordinate()), 2));
             }
+            public int GetIndex()
+            {
+                return index;
+            }
+            public void SetIndex(int index)
+            {
+                this.index = index;
+            }
 
         }
         public class Edge
@@ -78,7 +90,7 @@ namespace GraphsComputerNetwork
             
             private bool isDirected;
 
-            public Edge(bool isDirected, Vertex startVertex, Vertex endVertex, double Bandwidth=0, double currentFlow=0) 
+            public Edge(Vertex startVertex, Vertex endVertex, double Bandwidth=0, double currentFlow=0, bool isDirected=false) 
             {
                 this.isDirected = isDirected;
                 this.startVertex = startVertex;
@@ -147,6 +159,8 @@ namespace GraphsComputerNetwork
         private double[][] adjacencyMatrix;
         private double[][] loadMatrix;
         private double[][] fastestPathsMatrix;
+        private double[][] dist;
+        private int[][] prev;
         private double[][] tempFlows;
         private string name;
         private List<double> possibleBandwidths= new List<double>{ 2560, 3686, 4096, 5120, 8192, 10240, 10557, 13107, 13967, 16384,
@@ -164,6 +178,8 @@ namespace GraphsComputerNetwork
             this.name = name;
             adjacencyMatrix = new double[vertices.Count()][];
             this.loadMatrix = new double[vertices.Count()][];
+            dist = new double[vertices.Count()][];
+            prev = new int[vertices.Count()][];
             tempFlows = new double[vertices.Count()][];
             for (int i = 0; i < vertices.Count(); i++)
             {
@@ -171,11 +187,15 @@ namespace GraphsComputerNetwork
                 adjacencyMatrix[i] = new double[vertices.Count()];
                 this.loadMatrix[i]=new double[vertices.Count()];
                 tempFlows[i]= new double[vertices.Count()];
+                dist[i]= new double[vertices.Count()];
+                prev[i]=new int[vertices.Count()];
                 for (int j = 0; j < vertices.Count(); j++)
                 {
                     this.loadMatrix[i][j] =loadMatrix[i][j];
                     adjacencyMatrix[i][j] = 0;
                     tempFlows[i][j] = 0;
+                    prev[i][j] = 0;
+                    dist[i][j] = Double.PositiveInfinity;
                 }
                 
             }
@@ -193,7 +213,7 @@ namespace GraphsComputerNetwork
         }
         public void AddEdge(Vertex Vertex1, Vertex Vertex2, float maxLoad, bool isDirected,float currentLoad=0)
         {
-            edges.Append(new Edge(isDirected, Vertex1, Vertex2,maxLoad,currentLoad));
+            edges.Append(new Edge(Vertex1, Vertex2,maxLoad, currentLoad,isDirected));
         }
         public double[][] GetAdjacencyMatrix()
         {
@@ -206,9 +226,7 @@ namespace GraphsComputerNetwork
         public void AddVertex(Vertex newVertex)
         {
             vertices.Append(newVertex);
-            ReformAdjacencyMatrix();
-            GenerateFastestRoutes();
-            SuggestMinimalBandwidthsBasedOnTempLoads();
+            SyncVertexIndex();
         }
         public List<Vertex> GetVertices()
         {
@@ -251,7 +269,7 @@ namespace GraphsComputerNetwork
             this.name = name;
         }
         
-        public double GetShortestPath(Vertex vert1, Vertex vert2)
+        public double GetShortestPathLength(Vertex vert1, Vertex vert2)
         {
             return fastestPathsMatrix[vertices.IndexOf(vert1)][vertices.IndexOf(vert2)];
         }
@@ -292,6 +310,86 @@ namespace GraphsComputerNetwork
             }
             return;
         }
+
+        private void GenerateAllRoutes()
+        {
+            for(int i = 0; i < vertices.Count(); i++)
+            {
+                for (int j =0; j < vertices.Count(); j++)
+                {
+                    if (adjacencyMatrix[i][j] != 0)
+                    {
+                        dist[i][j] = adjacencyMatrix[i][j];
+                        prev[i][j] = i;
+                    }
+                    if (i == j)
+                    {
+                        dist[i][j] = 0;
+                        prev[i][j] = i;
+                    }
+                }
+            }
+            for(int k = 0; k < vertices.Count(); k++)
+            {
+                for(int u = 0; u < vertices.Count(); u++)
+                {
+                    for(int v=0; v < vertices.Count(); v++)
+                    {
+                        if (dist[u][v] > dist[u][k] + dist[k][v])
+                        {
+                            dist[u][v] = dist[u][k] + dist[k][v];
+                            prev[u][v] = prev[k][v];
+                        }
+                    }
+                }
+            }
+        }
+        public List<int> GetPath(Vertex vert1, Vertex vert2)
+        {
+            List<int> path = new List<int>();
+            if (prev[vert1.GetIndex()][vert2.GetIndex()]==0)
+            {
+                return null;
+            }
+            int v=vert1.GetIndex(), u=vert2.GetIndex();
+            while (u != v)
+            {
+                v = prev[u][v];
+                path.Prepend(v);
+            }
+            
+            return path;
+        }
+
+
+        public void CreateTempFlowsBasedOnPaths()
+        {
+            foreach(Edge e in edges)
+            {
+                for (int i = 0; i < GetPath(e.GetStartVertex(), e.GetEndVertex()).Count()-1; i++)
+                {
+                    tempFlows[i][i + 1] +=loadMatrix[i][i+1];
+                    if (!e.GetDirection())
+                    {
+                        tempFlows[i + 1][i] += loadMatrix[i][i + 1];
+                    }
+                }
+            }
+        }
+
+        private void SyncVertexIndex()
+        {
+            int i = 0;
+            foreach(Vertex v in vertices)
+            {
+                v.SetIndex(i);
+                i++;
+            }
+            ReformAdjacencyMatrix();
+            GenerateAllRoutes();
+            SuggestMinimalBandwidthsBasedOnTempLoads();
+        }
+
         private int MinDistanceIndex(double[] distance, bool[]sptSet,int V)
         {
             double min =double.MaxValue;
@@ -333,9 +431,7 @@ namespace GraphsComputerNetwork
                     }
                 }
             }
-            ReformAdjacencyMatrix();
-            GenerateFastestRoutes();
-            SuggestMinimalBandwidthsBasedOnTempLoads();
+            SyncVertexIndex();
         }
         public void RemoveEdge(Edge edge)
         {
@@ -353,24 +449,41 @@ namespace GraphsComputerNetwork
         }
         private void ReformAdjacencyMatrix()
         {
-            adjacencyMatrix = new double[vertices.Count()][];
-            for (int i = 0; i < vertices.Count(); i++)
+            if (vertices.Count() != 0)
             {
-                adjacencyMatrix[i] = new double[vertices.Count()];
-                for (int j = 0; j < vertices.Count(); j++)
+                dist = new double[vertices.Count()][];
+                prev = new int[vertices.Count()][];
+                adjacencyMatrix = new double[vertices.Count()][];
+                for (int i = 0; i < vertices.Count(); i++)
                 {
-                    adjacencyMatrix[i][j] = 0;
-                }
+                    dist[i] = new double[vertices.Count()];
+                    prev[i]= new int[vertices.Count()];
+                    adjacencyMatrix[i] = new double[vertices.Count()];
+                    for (int j = 0; j < vertices.Count(); j++)
+                    {
+                        adjacencyMatrix[i][j] = 0;
+                        dist[i][j] = Double.PositiveInfinity;
+                        prev[i][j] = 0;
+                    }
 
-            }
-            foreach (Edge i in edges)
-            {
-                adjacencyMatrix[vertices.IndexOf(i.GetStartVertex())][vertices.IndexOf(i.GetEndVertex())] = 1;
-                if (!i.GetDirection())
+                }
+                foreach (Edge i in edges)
                 {
-                    adjacencyMatrix[vertices.IndexOf(i.GetEndVertex())][vertices.IndexOf(i.GetStartVertex())] = 1;
+                    adjacencyMatrix[vertices.IndexOf(i.GetStartVertex())][vertices.IndexOf(i.GetEndVertex())] = 1;
+                    if (!i.GetDirection())
+                    {
+                        adjacencyMatrix[vertices.IndexOf(i.GetEndVertex())][vertices.IndexOf(i.GetStartVertex())] = 1;
+                    }
                 }
             }
+            else
+            {
+                adjacencyMatrix = null;
+                dist = null;
+                prev= null;
+                return;
+            }
+                
         }
         private void SuggestMinimalBandwidthsBasedOnTempLoads()
         {
@@ -400,6 +513,21 @@ namespace GraphsComputerNetwork
         {
             edge.SetBandwidth(newBandwidth);
         }
+        public void AddLoad(Edge edge,double additionalLoad)
+        {
+            edge.AddFlow(additionalLoad);
+        }
+        public void ClearGraph()
+        {
+            foreach (Vertex v in vertices)
+            {
+                RemoveVertex(v);
+            }
 
+        }
+        public Vertex GetVertex(int index)
+        {
+            return vertices[index];
+        }
     }
 }
